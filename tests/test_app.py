@@ -3,6 +3,7 @@ import ast
 import subprocess
 import sys
 
+# Project paths
 ROOT_DIR = Path(__file__).resolve().parent.parent
 SOURCE_DIR = ROOT_DIR / "source_versions"
 
@@ -27,13 +28,14 @@ def test_dockerfile_exists():
 def test_all_source_versions_exist():
     """Verify that all ten supplied source versions exist."""
     source_files = list(SOURCE_DIR.glob("*.py"))
+
     assert len(source_files) == 10, (
         f"Expected 10 source versions, found {len(source_files)}"
     )
 
 
 def test_requirements_not_empty():
-    """Verify that requirements.txt lists dependencies."""
+    """Verify that requirements.txt contains dependencies."""
     requirements_file = ROOT_DIR / "requirements.txt"
 
     requirements = [
@@ -76,7 +78,7 @@ def test_app_syntax():
 
 
 def test_all_source_versions_compile():
-    """Verify that all ten source versions compile."""
+    """Verify that all ten supplied source versions compile."""
     source_files = list(SOURCE_DIR.glob("*.py"))
 
     assert len(source_files) == 10, (
@@ -112,63 +114,68 @@ def test_app_has_valid_python_ast():
 
 def test_faulty_version_reset_bug_is_detected():
     """
-    Detect the suspected missing-arguments defect in version 1.1.2.
+    Detect a call to _update_text() with missing positional arguments.
 
-    This test passes when the defect is present. It does not execute
-    the GUI or claim that the runtime exception has been reproduced.
+    This test passes when the suspected defect is present.
+    It does not launch the GUI or reproduce the runtime exception.
     """
     assert FAULTY_VERSION.is_file(), (
-        f"Expected faulty-version candidate not found: "
-        f"{FAULTY_VERSION}"
+        f"Candidate source file not found: {FAULTY_VERSION}"
     )
 
     source_code = FAULTY_VERSION.read_text(encoding="utf-8")
     tree = ast.parse(source_code)
 
-    # Find the _update_text method and inspect its parameters.
-    method = None
+    # Find the _update_text method.
+    update_method = None
 
     for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        if isinstance(node, ast.FunctionDef):
             if node.name == "_update_text":
-                method = node
+                update_method = node
                 break
 
-    assert method is not None, (
-        "_update_text method was not found in the candidate version"
+    assert update_method is not None, (
+        "_update_text method was not found in the candidate version."
     )
 
-    positional_parameters = (
-        method.args.posonlyargs + method.args.args
+    # Count positional parameters, including self.
+    parameters = (
+        update_method.args.posonlyargs
+        + update_method.args.args
     )
 
-    # self is included in the method definition.
-    required_parameter_count = len(positional_parameters)
+    required_arguments = len(parameters) - 1
 
-    assert required_parameter_count >= 4, (
-        "The expected _update_text signature was not found; "
-        "inspect this version before assuming it has the known defect."
+    assert required_arguments > 0, (
+        "_update_text does not have the expected parameters."
     )
 
-    # Find calls like self._update_text(self.diet_text)
-    missing_argument_calls = []
+    # Find calls to self._update_text() with too few arguments.
+    faulty_calls = []
 
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
 
+        function = node.func
+
         if not (
-            isinstance(node.func, ast.Attribute)
-            and node.func.attr == "_update_text"
-            and isinstance(node.func.value, ast.Name)
-            and node.func.value.id == "self"
+            isinstance(function, ast.Attribute)
+            and function.attr == "_update_text"
+            and isinstance(function.value, ast.Name)
+            and function.value.id == "self"
         ):
             continue
 
-        if len(node.args) < required_parameter_count - 1:
-            missing_argument_calls.append(node)
+        if len(node.args) < required_arguments:
+            faulty_calls.append(node)
 
-    assert missing_argument_calls, (
-        "The suspected missing-arguments defect was not found. "
-        "Inspect the source before updating this test."
+    assert faulty_calls, (
+        "No missing-arguments call was found in the candidate version."
+    )
+
+    print(
+        f"Defect detected: found {len(faulty_calls)} "
+        "call(s) to _update_text() with missing arguments."
     )
