@@ -14,4 +14,4 @@ RUN test -f "/app/source_versions/${APP_VERSION}"
 
 ENV APP_VERSION=${APP_VERSION}
 
-CMD ["python", "-c", "import os, py_compile; py_compile.compile('/app/source_versions/' + os.environ['APP_VERSION'], doraise=True); print('Syntax validation successful:', os.environ['APP_VERSION'])"]
+CMD ["python", "-c", "import pathlib, py_compile; files=sorted(pathlib.Path('/app/source_versions').glob('*.py')); print('Validating', len(files), 'versions'); [py_compile.compile(str(f), doraise=True) for f in files]; print('All source versions compiled successfully')"]
