@@ -1,7 +1,7 @@
 from pathlib import Path
 import subprocess
 import sys
-
+import ast
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 SOURCE_DIR = ROOT_DIR / "source_versions"
