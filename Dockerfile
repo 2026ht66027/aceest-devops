@@ -8,5 +8,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app.py .
 COPY source_versions/ ./source_versions/
 COPY tests/ ./tests/
+COPY Dockerfile .
 
 CMD ["pytest", "-v"]
